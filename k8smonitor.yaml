@@ -1,0 +1,48 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: devops-clusteragent
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: devops-clusteragent
+    spec:
+      serviceAccountName: appd-k8s
+      initContainers:
+      - name: agent-repo
+        image: 632713433352.dkr.ecr.us-west-2.amazonaws.com/agent_repo:4.5.1.0
+        imagePullPolicy: Always
+        command: ["cp", "-r", "/sharedFiles/MachineAgent", "/mountPath/MachineAgent"]
+        volumeMounts:
+        - mountPath: /mountPath
+          name: shared-files
+      containers:
+        - name: devops-clusteragent
+          image: 632713433352.dkr.ecr.us-west-2.amazonaws.com/ad_devops_k8s_extension:0.72
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: controller-config
+          env:
+            - name: TIER_NAME
+              value: ClusterAgent
+            - name: METRIC_LIMIT
+              value: "2000"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: shared-files
+              mountPath: /sharedFiles
+            - name: config-volume
+              mountPath: /tmp/k8sconfig/
+      volumes:
+      - name: config-volume
+        configMap:
+          name: k8smachine-config
+      - name: shared-files
+        emptyDir: {}
+      restartPolicy: Always
